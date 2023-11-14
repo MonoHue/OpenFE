@@ -1,6 +1,7 @@
 import gc
 import os
 import warnings
+import psutil
 import lightgbm as lgb
 import pandas as pd
 from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
@@ -151,6 +152,7 @@ class OpenFE:
             n_data_blocks=8,
             min_candidate_features=2000,
             feature_boosting=False,
+            stage1_ratio=0.5,
             stage1_metric='predictive',
             stage2_metric='gain_importance',
             stage2_params=None,
@@ -300,7 +302,7 @@ class OpenFE:
 
         self.myprint(f"The number of candidate features is {len(self.candidate_features_list)}")
         self.myprint("Start stage I selection.")
-        self.candidate_features_list = self.stage1_select()
+        self.candidate_features_list = self.stage1_select(ratio=stage1_ratio)
         self.myprint(f"The number of remaining candidate features is {len(self.candidate_features_list)}")
         self.myprint("Start stage II selection.")
         self.new_features_scores_list = self.stage2_select()
@@ -504,9 +506,11 @@ class OpenFE:
     def stage2_select(self):
         data_new = []
         new_features = []
+        print('at stage2_select: self._calculate')
         self.candidate_features_list = self._calculate(self.candidate_features_list,
                                                        self.train_index.to_list(),
                                                        self.val_index.to_list())
+        print('at stage2_select: combine data')
         index_tmp = self.candidate_features_list[0].data.index
         for feature in self.candidate_features_list:
             new_features.append(tree_to_formula(feature))
@@ -809,6 +813,9 @@ class OpenFE:
         self.myprint("Finish transformation.")
         os.remove(self.tmp_save_path)
         return _train, _test
+
+    def get_memory(self):
+        return psutil.virtual_memory()[2], psutil.virtual_memory()[3]/1e9
 
 
 
