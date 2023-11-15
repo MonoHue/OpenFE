@@ -1,24 +1,22 @@
 import gc
 import os
-import warnings
-import psutil
-import lightgbm as lgb
-import pandas as pd
-from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
-from .FeatureGenerator import *
 import random
-from concurrent.futures import ProcessPoolExecutor
+import psutil
+import warnings
 import traceback
-from .utils import tree_to_formula, check_xor, formula_to_tree
+import pandas as pd
+import lightgbm as lgb
+from .FeatureGenerator import *
+from concurrent.futures import ProcessPoolExecutor
 from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
 from sklearn.metrics import mean_squared_error, log_loss, roc_auc_score
-import scipy.special
+from .utils import tree_to_formula, check_xor, formula_to_tree
+from scipy import special
 from copy import deepcopy
 from tqdm import tqdm
-# import tracemalloc
 from datetime import datetime
-import warnings
 warnings.filterwarnings(action='ignore', category=UserWarning)
 
 
@@ -156,6 +154,7 @@ class OpenFE:
             stage1_metric='predictive',
             stage2_metric='gain_importance',
             stage2_params=None,
+            mp_block_size=2048,
             is_stage1=True,
             n_repeats=1,
             tmp_save_path='./openfe_tmp_data_xx.feather',
@@ -282,6 +281,7 @@ class OpenFE:
         self.stage2_metric = stage2_metric
         self.feature_boosting = feature_boosting
         self.stage2_params = stage2_params
+        self.mp_block_size = mp_block_size
         self.is_stage1 = is_stage1
         self.n_repeats = n_repeats
         self.tmp_save_path = tmp_save_path
@@ -433,7 +433,7 @@ class OpenFE:
 
                     if use_train:
                         init_scores[train_index] += (gbm.predict_proba(X_train, raw_score=True) if self.task == "classification" else \
-                                                 gbm.predict(X_train)) / (skf.n_splits - 1)
+                                                     gbm.predict(X_train)) / (skf.n_splits - 1)
                     else:
                         init_scores[val_index] = gbm.predict_proba(X_val, raw_score=True) if self.task == "classification" else \
                             gbm.predict(X_val)
@@ -565,19 +565,19 @@ class OpenFE:
             for i, imp in enumerate(r.importances_mean[:len(new_features)]):
                 results.append([formula_to_tree(new_features[i]), imp])
         results = sorted(results, key=lambda x: x[1], reverse=True)
-        return results
 
+        return results
 
     def get_init_metric(self, pred, label):
         if self.metric == 'binary_logloss':
-            init_metric = log_loss(label, scipy.special.expit(pred), labels=[0, 1])
+            init_metric = log_loss(label, special.expit(pred), labels=[0, 1])
         elif self.metric == 'multi_logloss':
-            init_metric = log_loss(label, scipy.special.softmax(pred, axis=1),
+            init_metric = log_loss(label, special.softmax(pred, axis=1),
                                    labels=list(range(pred.shape[1])))
         elif self.metric == 'rmse':
             init_metric = mean_squared_error(label, pred, squared=False)
         elif self.metric == 'auc':
-            init_metric = roc_auc_score(label, scipy.special.expit(pred))
+            init_metric = roc_auc_score(label, special.expit(pred))
         else:
             raise NotImplementedError(f"Metric {self.metric} is not supported. "
                                       f"Please select metric from ['binary_logloss', 'multi_logloss'"
@@ -664,10 +664,10 @@ class OpenFE:
             print(traceback.format_exc())
             exit()
 
-    def _calculate(self, candidate_features, train_idx, val_idx, block_size=2048):
+    def _calculate(self, candidate_features, train_idx, val_idx):
         results = []
         # length = int(np.ceil(len(candidate_features) / self.n_jobs / 4))
-        length = block_size
+        length = self.mp_block_size
         n = int(np.ceil(len(candidate_features) / length))
         random.shuffle(candidate_features)
         # for f in candidate_features:
@@ -717,10 +717,10 @@ class OpenFE:
             print(traceback.format_exc())
             exit()
 
-    def _calculate_and_evaluate(self, candidate_features, train_idx, val_idx, block_size=2048):
+    def _calculate_and_evaluate(self, candidate_features, train_idx, val_idx):
         results = []
         # length = int(np.ceil(len(candidate_features) / self.n_jobs / 4))
-        length = block_size
+        length = self.mp_block_size
         print(f'candidate_features length: {len(candidate_features)}')
         print(f'calculate and evaluate block size: {length}')
         # import pdb;pdb.set_trace()
@@ -823,6 +823,3 @@ class OpenFE:
 
     def get_memory(self):
         return psutil.virtual_memory()[2], psutil.virtual_memory()[3]/1e9
-
-
-
