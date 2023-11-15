@@ -517,6 +517,7 @@ class OpenFE:
             data_new.append(feature.data.values)
             feature.delete()
         gc.collect()
+        print('at stage2_select: finish make new data')
         data_new = np.vstack(data_new)
         data_new = pd.DataFrame(data_new.T, index=index_tmp,
                                 columns=['autoFE-%d' % i for i in range(len(new_features))])
@@ -528,6 +529,7 @@ class OpenFE:
         data_new = data_new.replace([np.inf, -np.inf], np.nan)
         if self.drop_columns is not None:
             data_new = data_new.drop(self.drop_columns, axis=1)
+        print('at stage2_select: split train and test')
         train_y = self.label.loc[self.train_index]
         val_y = self.label.loc[self.val_index]
         train_init = self.init_scores.loc[self.train_index]
