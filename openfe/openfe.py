@@ -664,9 +664,10 @@ class OpenFE:
             print(traceback.format_exc())
             exit()
 
-    def _calculate(self, candidate_features, train_idx, val_idx):
+    def _calculate(self, candidate_features, train_idx, val_idx, block_size=2048):
         results = []
-        length = int(np.ceil(len(candidate_features) / self.n_jobs / 4))
+        # length = int(np.ceil(len(candidate_features) / self.n_jobs / 4))
+        length = block_size
         n = int(np.ceil(len(candidate_features) / length))
         random.shuffle(candidate_features)
         # for f in candidate_features:
@@ -716,9 +717,13 @@ class OpenFE:
             print(traceback.format_exc())
             exit()
 
-    def _calculate_and_evaluate(self, candidate_features, train_idx, val_idx):
+    def _calculate_and_evaluate(self, candidate_features, train_idx, val_idx, block_size=2048):
         results = []
-        length = int(np.ceil(len(candidate_features) / self.n_jobs / 4))
+        # length = int(np.ceil(len(candidate_features) / self.n_jobs / 4))
+        length = block_size
+        print(f'candidate_features length: {len(candidate_features)}')
+        print(f'calculate and evaluate block size: {length}')
+        # import pdb;pdb.set_trace()
         n = int(np.ceil(len(candidate_features) / length))
         random.shuffle(candidate_features)
         for f in candidate_features:
