@@ -154,7 +154,7 @@ class OpenFE:
             stage1_metric='predictive',
             stage2_metric='gain_importance',
             stage2_params=None,
-            mp_block_size=2048,
+            mp_block_size=1024,
             is_stage1=True,
             n_repeats=1,
             tmp_save_path='./openfe_tmp_data_xx.feather',
