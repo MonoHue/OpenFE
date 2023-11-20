@@ -156,6 +156,7 @@ class OpenFE:
             stage2_params=None,
             mp_block_size=1024,
             is_stage1=True,
+            n_gbm_estimators=1000,
             n_repeats=1,
             tmp_save_path='./openfe_tmp_data_xx.feather',
             n_jobs=1,
@@ -273,6 +274,7 @@ class OpenFE:
 
         self.data = data
         self.label = label
+        del data, label
         self.metric = metric
         self.drop_columns = drop_columns
         self.n_data_blocks = n_data_blocks
@@ -284,6 +286,7 @@ class OpenFE:
         self.mp_block_size = mp_block_size
         self.is_stage1 = is_stage1
         self.n_repeats = n_repeats
+        self.n_gbm_estimators=n_gbm_estimators
         self.tmp_save_path = tmp_save_path
         self.n_jobs = n_jobs
         self.seed = seed
@@ -300,9 +303,11 @@ class OpenFE:
         self.train_index, self.val_index = self.get_index(train_index, val_index)
         self.init_scores = self.get_init_score(init_scores)
 
+        gc.collect()
         self.myprint(f"The number of candidate features is {len(self.candidate_features_list)}")
         self.myprint("Start stage I selection.")
         self.candidate_features_list = self.stage1_select(ratio=stage1_ratio)
+        gc.collect()
         self.myprint(f"The number of remaining candidate features is {len(self.candidate_features_list)}")
         self.myprint("Start stage II selection.")
         self.new_features_scores_list = self.stage2_select()
@@ -407,12 +412,13 @@ class OpenFE:
                 data = self.data.copy()
                 label = self.label.copy()
 
-                params = {"n_estimators": 10000, "learning_rate": 0.1, "metric": self.metric,
-                          "seed": self.seed, "n_jobs": self.n_jobs}
+                params = {"n_estimators": self.n_gbm_estimators, "learning_rate": 0.1, "metric": self.metric, "verbosity": -1,
+                          "seed": self.seed, "n_jobs": self.n_jobs, "early_stopping_round": 200}
                 if self.task == "regression":
-                    gbm = lgb.LGBMRegressor(**params)
+                    params["objective"] = "regression"
                 else:
-                    gbm = lgb.LGBMClassifier(**params)
+                    params["objective"] = "multiclass"
+                    params["num_class"] = len(np.unique(label))
 
                 for feature in self.categorical_features:
                     data[feature] = data[feature].astype('category')
@@ -428,15 +434,18 @@ class OpenFE:
                     X_train, y_train = data.iloc[train_index], label.iloc[train_index]
                     X_val, y_val = data.iloc[val_index], label.iloc[val_index]
 
-                    gbm.fit(X_train, y_train.values.ravel(),
-                            eval_set=[[X_val, y_val.values.ravel()]], callbacks=[lgb.early_stopping(200)])
+                    bst = lgb.train(
+                        params=params,
+                        train_set=lgb.Dataset(X_train, y_train.values.ravel(), free_raw_data=True),
+                        valid_sets=lgb.Dataset(X_val, y_val.values.ravel(), free_raw_data=True),
+                    )
 
                     if use_train:
-                        init_scores[train_index] += (gbm.predict_proba(X_train, raw_score=True) if self.task == "classification" else \
-                                                     gbm.predict(X_train)) / (skf.n_splits - 1)
+                        init_scores[train_index] += (bst.predict(X_train, raw_score=True) if self.task == "classification" else \
+                                                     bst.predict(X_train)) / (skf.n_splits - 1)
                     else:
-                        init_scores[val_index] = gbm.predict_proba(X_val, raw_score=True) if self.task == "classification" else \
-                            gbm.predict(X_val)
+                        init_scores[val_index] = bst.predict(X_val, raw_score=True) if self.task == "classification" else \
+                            bst.predict(X_val)
 
                 init_scores = pd.DataFrame(init_scores, index=data.index)
             else:
@@ -548,7 +557,7 @@ class OpenFE:
         gc.collect()
         self.myprint("Finish data processing.")
         if self.stage2_params is None:
-            params = {"n_estimators": 1000, "importance_type": "gain", "num_leaves": 16,
+            params = {"n_estimators": self.n_gbm_estimators, "importance_type": "gain", "num_leaves": 16,
                       "seed": 1, "n_jobs": self.n_jobs}
         else:
             params = self.stage2_params
@@ -666,6 +675,7 @@ class OpenFE:
                 candidate_feature.calculate(data_temp, is_root=True)
                 candidate_feature.f_delete()
                 results.append(candidate_feature)
+            gc.collect()
             return results
         except:
             print(traceback.format_exc())
@@ -719,6 +729,7 @@ class OpenFE:
                 score = self._evaluate(candidate_feature, train_y, val_y, train_init, val_init, init_metric)
                 candidate_feature.delete()
                 results.append([candidate_feature, score])
+            gc.collect()
             return results
         except:
             print(traceback.format_exc())
