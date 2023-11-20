@@ -273,6 +273,7 @@ class OpenFE:
 
         self.data = data
         self.label = label
+        del data, label
         self.metric = metric
         self.drop_columns = drop_columns
         self.n_data_blocks = n_data_blocks
@@ -300,9 +301,11 @@ class OpenFE:
         self.train_index, self.val_index = self.get_index(train_index, val_index)
         self.init_scores = self.get_init_score(init_scores)
 
+        gc.collect()
         self.myprint(f"The number of candidate features is {len(self.candidate_features_list)}")
         self.myprint("Start stage I selection.")
         self.candidate_features_list = self.stage1_select(ratio=stage1_ratio)
+        gc.collect()
         self.myprint(f"The number of remaining candidate features is {len(self.candidate_features_list)}")
         self.myprint("Start stage II selection.")
         self.new_features_scores_list = self.stage2_select()
