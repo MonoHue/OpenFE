@@ -159,8 +159,8 @@ def transform(X_train, X_test, new_features_list, n_jobs, name=""):
             _train[c] = _train[c].astype('category')
             _test[c] = _test[c].astype('category')
         else:
-            _train[c] = _train[c].astype('float')
-            _test[c] = _test[c].astype('float')
+            _train[c] = _train[c].astype('float32')
+            _test[c] = _test[c].astype('float32')
     _train = pd.concat([X_train, _train], axis=1)
     _test = pd.concat([X_test, _test], axis=1)
     return _train, _test

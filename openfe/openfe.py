@@ -493,7 +493,8 @@ class OpenFE:
                 idx = len(train_index_samples)
                 self.myprint("Meet early-stopping in successive feature-wise halving.")
             candidate_features_list = [item[0] for item in candidate_features_scores[:n_reserved_features]]
-            del candidate_features_scores[n_reserved_features:]; gc.collect()
+            del candidate_features_scores[n_reserved_features:]
+            gc.collect()
 
             results = self._calculate_and_evaluate(candidate_features_list, train_idx, val_idx)
             candidate_features_scores = sorted(results, key=lambda x: x[1], reverse=True)
@@ -521,11 +522,17 @@ class OpenFE:
         data_new = np.vstack(data_new)
         data_new = pd.DataFrame(data_new.T, index=index_tmp,
                                 columns=['autoFE-%d' % i for i in range(len(new_features))])
+
+        for f in data_new.columns.to_list():
+            if data_new[f].dtype == 'float64':
+                data_new[f] = data_new[f].astype('float32')
         data_new = pd.concat([data_new, self.data], axis=1)
+
         for f in self.categorical_features:
             data_new[f] = data_new[f].astype('category')
             data_new[f] = data_new[f].cat.codes
             data_new[f] = data_new[f].astype('category')
+
         data_new = data_new.replace([np.inf, -np.inf], np.nan)
         if self.drop_columns is not None:
             data_new = data_new.drop(self.drop_columns, axis=1)
@@ -813,8 +820,8 @@ class OpenFE:
                 _train[c] = _train[c].astype('category')
                 _test[c] = _test[c].astype('category')
             else:
-                _train[c] = _train[c].astype('float')
-                _test[c] = _test[c].astype('float')
+                _train[c] = _train[c].astype('float32')
+                _test[c] = _test[c].astype('float32')
         _train = pd.concat([X_train, _train], axis=1)
         _test = pd.concat([X_test, _test], axis=1)
         self.myprint("Finish transformation.")
