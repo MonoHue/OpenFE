@@ -160,6 +160,7 @@ class OpenFE:
             n_repeats=1,
             tmp_save_path='./openfe_tmp_data_xx.feather',
             n_jobs=1,
+            n_proc_jobs=1,
             seed=1,
             verbose=True):
         ''' Generate new features by the algorithm of OpenFE
@@ -289,6 +290,7 @@ class OpenFE:
         self.n_gbm_estimators=n_gbm_estimators
         self.tmp_save_path = tmp_save_path
         self.n_jobs = n_jobs
+        self.n_proc_jobs = n_proc_jobs
         self.seed = seed
         self.verbose = verbose
 
@@ -558,7 +560,7 @@ class OpenFE:
         self.myprint("Finish data processing.")
         if self.stage2_params is None:
             params = {"n_estimators": self.n_gbm_estimators, "importance_type": "gain", "num_leaves": 16,
-                      "seed": 1, "n_jobs": self.n_jobs}
+                      "seed": 1, "n_jobs": self.n_jobs, 'verbosity': -1}
         else:
             params = self.stage2_params
         if self.metric is not None:
@@ -624,7 +626,7 @@ class OpenFE:
             val_x = pd.DataFrame(candidate_feature.data.loc[val_y.index])
             if self.stage1_metric == 'predictive':
                 params = {"n_estimators": 100, "importance_type": "gain", "num_leaves": 16,
-                          "seed": 1, "deterministic": True, "n_jobs": 1}
+                          "seed": 1, "deterministic": True, "n_jobs": self.n_proc_jobs, 'verbosity': -1}
                 if self.metric is not None:
                     params.update({"metric": self.metric})
                 if self.task == 'classification':
